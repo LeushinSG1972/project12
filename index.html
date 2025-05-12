@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Double Integral z = ∫∫(x² + y²) dx dy</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #f0f0f0;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+        }
+        #equation {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h2>Double Integral Visualization</h2>
+        <p>Mouse: Rotate view</p>
+        <p>Wheel: Zoom in/out</p>
+        <p>Drag: Pan view</p>
+    </div>
+    <div id="equation">z = ∫∫(x² + y²) dx dy</div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+    
+    <script>
+        // Initialize the scene
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf0f0f0);
+        
+        // Initialize the camera
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(4, 4, 4);
+        
+        // Initialize the renderer
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+        
+        // Add orbit controls
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        
+        // Add axes helper
+        const axesHelper = new THREE.AxesHelper(3);
+        scene.add(axesHelper);
+        
+        // Add grid helper
+        const gridHelper = new THREE.GridHelper(10, 20);
+        scene.add(gridHelper);
+        
+        // Parameters for the surface
+        const params = {
+            range: 2,
+            resolution: 50,
+            wireframe: false,
+            color: 0x3498db
+        };
+        
+        // Create the surface geometry
+        let surfaceGeometry = createSurfaceGeometry(params.range, params.resolution);
+        let surfaceMaterial = new THREE.MeshPhongMaterial({ 
+            color: params.color, 
+            side: THREE.DoubleSide,
+            wireframe: params.wireframe,
+            flatShading: true
+        });
+        let surfaceMesh = new THREE.Mesh(surfaceGeometry, surfaceMaterial);
+        scene.add(surfaceMesh);
+        
+        // Add lights
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(1, 1, 1);
+        scene.add(directionalLight);
+        
+        // GUI controls
+        const gui = new dat.GUI();
+        gui.add(params, 'range', 1, 5).step(0.1).name('Range').onChange(updateSurface);
+        gui.add(params, 'resolution', 10, 100).step(1).name('Resolution').onChange(updateSurface);
+        gui.add(params, 'wireframe').name('Wireframe').onChange(updateSurface);
+        gui.addColor(params, 'color').name('Color').onChange(updateSurface);
+        
+        // Function to create the surface geometry
+        function createSurfaceGeometry(range, resolution) {
+            const geometry = new THREE.BufferGeometry();
+            
+            const vertices = [];
+            const indices = [];
+            
+            const step = (2 * range) / resolution;
+            
+            // Create vertices
+            for (let i = 0; i <= resolution; i++) {
+                const x = -range + (i * step);
+                
+                for (let j = 0; j <= resolution; j++) {
+                    const y = -range + (j * step);
+                    const z = x * x + y * y; // z = x² + y²
+                    vertices.push(x, y, z);
+                }
+            }
+            
+            // Create indices for triangles
+            for (let i = 0; i < resolution; i++) {
+                for (let j = 0; j < resolution; j++) {
+                    const a = i * (resolution + 1) + j;
+                    const b = a + 1;
+                    const c = (i + 1) * (resolution + 1) + j;
+                    const d = c + 1;
+                    
+                    // Create two triangles for each quad
+                    indices.push(a, b, d);
+                    indices.push(a, d, c);
+                }
+            }
+            
+            geometry.setIndex(indices);
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+            
+            // Compute normals for proper lighting
+            geometry.computeVertexNormals();
+            
+            return geometry;
+        }
+        
+        // Function to update the surface when parameters change
+        function updateSurface() {
+            // Remove old surface
+            scene.remove(surfaceMesh);
+            
+            // Create new surface with updated parameters
+            surfaceGeometry = createSurfaceGeometry(params.range, params.resolution);
+            surfaceMaterial = new THREE.MeshPhongMaterial({ 
+                color: params.color, 
+                side: THREE.DoubleSide,
+                wireframe: params.wireframe,
+                flatShading: true
+            });
+            surfaceMesh = new THREE.Mesh(surfaceGeometry, surfaceMaterial);
+            scene.add(surfaceMesh);
+        }
+        
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // Start animation
+        animate();
+    </script>
+</body>
+</html>
